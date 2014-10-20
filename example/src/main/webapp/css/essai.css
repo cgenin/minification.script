@@ -1,0 +1,37 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#toolbar {
+    margin: 10px;
+    background-color: aquamarine;
+    border: dashed thin darkblue;
+    padding-left: 150px;
+}
+
+#label {
+    color: orangered;
+    font-family: "Helvetic Neue", Helvetica, Arial;
+}
+
+
+#content {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background-color:  darkslateblue;
+    color: lemonchiffon;
+    font-family: "courier new", monospace;
+}
+
+
+#label, #content {
+    text-align: center;
+
+}
+
+.inline {
+    display: inline;
+    padding-right: 25px;
+}
+
