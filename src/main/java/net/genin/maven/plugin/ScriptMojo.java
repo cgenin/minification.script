@@ -9,7 +9,9 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 
@@ -71,6 +73,7 @@ public class ScriptMojo extends AbstractMojo {
                     builder.toUglifyJs();
             }
             final Minify minify = builder.build();
+            final Concatener concatener = new Concatener.Builder(root).build();
             getLog().info("Launch ...");
             new Template.Builder(exts).notTemplate((n) -> {
 //              If not an template just copy to dest dir.
@@ -85,18 +88,21 @@ public class ScriptMojo extends AbstractMojo {
                     final ArrayListMultimap<String, String> scripts = t.scripts();
 //                  if no annoted scripts.
                     if (scripts.isEmpty()) {
-                        getLog().info("Copy " + t.url);
+                        getLog().info("No Script - Copy " + t.url);
                         new WriterManager(root, t.url, destDir).run().copy();
                     } else {
                         getLog().info("Treat " + t.url);
 //                      Copy the modified template.
                         new WriterManager(root, t.url, destDir).run().write(t.stream());
+
                         scripts.keySet().forEach(k -> {
 //                          for each scripts
                             try {
 //                              Minify and write to destination directory.
                                 final String s = root + "/" + k;
-                                new WriterManager(root, new File(s).toURI().toURL(), destDir).run().write(minify.stream(scripts.get(k)));
+                                final Template.Action action = t.toAction(k);
+                                final InputStream stream = getInputStream(minify, concatener, scripts, k, action);
+                                new WriterManager(root, new File(s).toURI().toURL(), destDir).run().write(stream);
 
                             } catch (Exception e) {
                                 Throwables.propagate(e);
@@ -107,7 +113,7 @@ public class ScriptMojo extends AbstractMojo {
                     Throwables.propagate(e);
                 }
             })
-            .traverse(file);
+                    .traverse(file);
             getLog().info("Finish");
         } catch (MojoExecutionException | MojoFailureException e) {
             throw e;
@@ -117,6 +123,19 @@ public class ScriptMojo extends AbstractMojo {
         }
 
 
+    }
+
+    private InputStream getInputStream(Minify minify, Concatener concatener, ArrayListMultimap<String, String> scripts, String k, Template.Action action) throws Exception {
+        switch (action) {
+            case minify:
+                return minify.stream(scripts.get(k));
+            case concat:
+                return concatener.stream(scripts.get(k));
+            case delete:
+                return new ByteArrayInputStream(new byte[0]);
+            default:
+                throw new IllegalStateException("No action found" + action);
+        }
     }
 
     @VisibleForTesting

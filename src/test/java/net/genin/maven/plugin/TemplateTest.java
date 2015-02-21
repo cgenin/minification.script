@@ -59,9 +59,7 @@ public class TemplateTest {
             assertTrue(t.url.toString().endsWith("essai.json"));
             assertTrue(t.scripts().isEmpty());
 
-        }).template(t -> {
-            assertFalse(true);
-        }).traverse(resource);
+        }).template(t -> assertFalse(true)).traverse(resource);
     }
 
     @Test
@@ -147,6 +145,37 @@ public class TemplateTest {
                                 "<title>TEST</title> \n" +
                                 "<script type=\"application/javascript\" src=\"/js/another.js\"></script> </head><body> \n" +
                                 "<script type=\"application/javascript\" src=\"/min/new.min.js\"></script><script type=\"application/javascript\" src=\"/min/test.min.js\"></script></body></html>", s);
+
+                    } catch (IOException e) {
+                        Throwables.propagate(e);
+                    }
+
+                }).traverse(resource);
+    }
+
+    @Test
+    public void testTemplateWithDelete() throws Exception {
+
+        final URL resource = Resources.getResource("template5");
+        new Template.Builder(Lists.newArrayList("html"))
+                .notTemplate(t -> assertFalse(true))
+                .template(t -> {
+                    final Multimap<String, String> scripts = t.scripts();
+                    assertFalse(scripts.isEmpty());
+                    assertEquals(1, scripts.keySet().size());
+
+                    final List<String> newScript = Lists.newArrayList(scripts.get("/min/new.min.js"));
+                    assertEquals(1, newScript.size());
+                    assertTrue(newScript.contains("/js/new.js"));
+
+                    try {
+                        final String s = CharStreams.toString(new InputStreamReader(t.stream(), Charsets.UTF_8));
+                        assertEquals("<!DOCTYPE html>\n" +
+                                "<html><head lang=\"en\"> \n" +
+                                "<meta charset=\"UTF-8\" /> \n" +
+                                "<title>TEST</title> \n" +
+                                "<script type=\"application/javascript\" src=\"/js/another.js\"></script> </head><body> \n" +
+                                "<script type=\"application/javascript\" src=\"/min/new.min.js\"></script></body></html>", s);
 
                     } catch (IOException e) {
                         Throwables.propagate(e);

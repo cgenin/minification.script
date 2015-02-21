@@ -5,6 +5,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 import org.htmlcleaner.CleanerProperties;
@@ -16,6 +17,8 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Template Manager for HTML.
@@ -23,6 +26,8 @@ import java.util.List;
  */
 public abstract class Template {
 
+
+    public static final String DATA_ACTION_ATTR = "data-action-min";
     /**
      * Url of the file.
      */
@@ -36,12 +41,15 @@ public abstract class Template {
      */
     abstract ArrayListMultimap<String, String> scripts();
 
+
     /**
      * Open an stream which contains the resulted template.
      *
      * @return the stream.
      */
     abstract InputStream stream();
+
+    abstract Action toAction(final String key);
 
     /**
      * Constructor.
@@ -169,6 +177,10 @@ public abstract class Template {
         return new HtmlCleaner(cleanerProps);
     }
 
+    public static enum Action {
+        minify, concat, delete, copy;
+    }
+
     /**
      * Class for template file.
      */
@@ -181,6 +193,9 @@ public abstract class Template {
          * the minified content.
          */
         private byte[] datas;
+
+        private Map<String, Action> actions = Maps.newConcurrentMap();
+
         /**
          * the instance of HtmlCleaner.
          */
@@ -205,6 +220,14 @@ public abstract class Template {
             return tagNode.hasAttribute("data-script-min");
         }
 
+        private boolean action(TagNode tagNode) {
+            return tagNode.hasAttribute(DATA_ACTION_ATTR);
+        }
+
+        public Action toAction(final String key) {
+            return actions.get(key);
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -219,8 +242,20 @@ public abstract class Template {
                             && isScript((TagNode) htmlNode)
                             && ownAttribute((TagNode) htmlNode)) {
 
-                        results.put(((TagNode) htmlNode).getAttributeByName(DATA_ATTR),
-                                ((TagNode) htmlNode).getAttributeByName("src"));
+
+                        final String dest = ((TagNode) htmlNode).getAttributeByName(DATA_ATTR);
+                        final Action action = Optional.of((TagNode) htmlNode).filter((n) -> action(n))
+                                .map((n) -> Action.valueOf(n.getAttributeByName(DATA_ACTION_ATTR))).orElse(Action.minify);
+                        if (!actions.containsKey(dest)) {
+                            actions.put(dest, action);
+                        }
+
+                        if(!Action.delete.equals(action)){
+                            results.put(dest,
+                                    ((TagNode) htmlNode).getAttributeByName("src"));
+                        }
+
+
                         parentNode.removeChild(htmlNode);
                     }
                     return true;
@@ -239,8 +274,6 @@ public abstract class Template {
             } catch (Exception ex) {
                 Throwables.propagate(ex);
             }
-
-
             return results;
         }
 
@@ -258,10 +291,12 @@ public abstract class Template {
                         && isBody((TagNode) htmlNode)) {
                     scripts.keySet().forEach(
                             k -> {
-                                final TagNode script = new TagNode("script");
-                                script.addAttribute("type", "application/javascript");
-                                script.addAttribute("src", k);
-                                ((TagNode) htmlNode).addChild(script);
+                                if (!Action.delete.equals(toAction(k))) {
+                                    final TagNode script = new TagNode("script");
+                                    script.addAttribute("type", "application/javascript");
+                                    script.addAttribute("src", k);
+                                    ((TagNode) htmlNode).addChild(script);
+                                }
                             }
                     );
 
@@ -330,6 +365,11 @@ public abstract class Template {
         @Override
         ArrayListMultimap<String, String> scripts() {
             return ArrayListMultimap.create();
+        }
+
+        @Override
+        Action toAction(String key) {
+            return Action.copy;
         }
     }
 }
