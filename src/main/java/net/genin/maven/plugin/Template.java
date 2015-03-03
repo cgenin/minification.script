@@ -178,7 +178,7 @@ public abstract class Template {
     }
 
     public static enum Action {
-        minify, concat, delete, copy;
+        minify, concat, delete, copy, jsx;
     }
 
     /**
@@ -250,7 +250,7 @@ public abstract class Template {
                             actions.put(dest, action);
                         }
 
-                        if(!Action.delete.equals(action)){
+                        if (!Action.delete.equals(action)) {
                             results.put(dest,
                                     ((TagNode) htmlNode).getAttributeByName("src"));
                         }
